@@ -266,7 +266,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbw7nrderXO9dUdWJVnOkEskQ-3GAuwV-9wgewX3YZwD4INMyamoIMsMrpcLSaabzQC5Jw/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbw78KdZ7EDKWgSplUMOPs_9iM8JqkRzlQjFeehX-4Td1NhDeSWwwtSWq4LqlIgk-tCMBg/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -810,7 +810,9 @@
                     if (wizard.signatures.receivedBy) { delivery.toContact = wizard.signatures.receivedBy; }
                     
                     // ✅ NOUVEAU v18.7 : Générer et archiver CMR automatiquement
-                    await this.generateAndArchiveCMR(delivery);
+                    // v18.7: CMR généré automatiquement côté serveur lors de la sync
+                    // Plus besoin d'appel depuis le navigateur (évite problème CORS)
+                    // await this.generateAndArchiveCMR(delivery);
                 }
                 delivery.lastUpdated = now;
                 this.saveLocalData();
