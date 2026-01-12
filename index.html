@@ -882,52 +882,56 @@
                 const delivery = this.data.deliveries.find(d => d.id === id); 
                 if (!delivery) return; 
                 
-                // Si CMR déjà généré, afficher directement
+                // Si CMR déjà en mémoire, afficher directement
                 if (delivery.cmrNumber && delivery.cmrNumber.startsWith('CMR-')) {
-                    console.log('CMR déjà existant:', delivery.cmrNumber);
+                    console.log('✅ CMR existant en mémoire:', delivery.cmrNumber);
                     this.populateCMRView(delivery); 
                     document.getElementById('cmr-view').style.display = 'block';
                     return;
                 }
                 
-                // Sinon, générer un nouveau CMR
-                this.showToast('🎫 Génération numéro CMR...');
+                // Sinon, recharger les données depuis le serveur pour obtenir le CMR
+                // (Le CMR a été généré côté serveur lors de la sync)
+                this.showToast('🔄 Chargement du CMR...');
                 try {
-                    // Préparer les données minimales pour l'archive
-                    const deliveryData = {
-                        nature: delivery.nature || '',
-                        driver: delivery.driver || this.data.currentUser,
-                        fromAddr: delivery.fromAddr || '',
-                        toAddr: delivery.toAddr || '',
-                        status: delivery.status || 'delivered'
-                    };
+                    console.log('🔄 Rechargement des données pour obtenir le CMR...');
                     
-                    // Encoder les données pour l'URL
-                    const encodedData = encodeURIComponent(JSON.stringify(deliveryData));
+                    // Recharger toutes les livraisons depuis le serveur
+                    const response = await fetch(SHEET_API_URL);
+                    const result = await response.json();
                     
-                    // Appel API avec les données
-                    const response = await fetch(SHEET_API_URL + '&action=get_cmr_number&delivery=' + encodedData);
-                    const data = await response.json();
-                    
-                    if (data.status === 'success' && data.data.cmrNumber) {
-                        delivery.cmrNumber = data.data.cmrNumber;
+                    if (result.status === 'success' && result.data) {
+                        // Mettre à jour les livraisons
+                        this.data.deliveries = result.data;
+                        this.saveLocalData();
                         
-                        if (data.data.archived) {
-                            this.showToast('✅ CMR ' + delivery.cmrNumber + ' généré et archivé');
+                        // Retrouver la livraison mise à jour
+                        const updatedDelivery = this.data.deliveries.find(d => d.id === id);
+                        
+                        if (updatedDelivery && updatedDelivery.cmrNumber) {
+                            console.log('✅ CMR trouvé:', updatedDelivery.cmrNumber);
+                            this.populateCMRView(updatedDelivery);
+                            document.getElementById('cmr-view').style.display = 'block';
+                            this.showToast('✅ CMR: ' + updatedDelivery.cmrNumber);
                         } else {
-                            this.showToast('✅ CMR ' + delivery.cmrNumber + ' généré');
+                            // Pas encore de CMR - généré dans quelques secondes
+                            this.showToast('⏳ CMR en cours de génération... Réessayez dans 5 secondes');
+                            console.log('⏳ CMR pas encore disponible - sync en cours');
                         }
                     } else {
-                        delivery.cmrNumber = 'CMR-ERROR';
-                        this.showToast('⚠️ Erreur numéro CMR');
+                        throw new Error('Erreur chargement données');
                     }
                 } catch (error) {
-                    console.error('Erreur génération CMR:', error);
-                    delivery.cmrNumber = 'CMR-' + String(delivery.id).padStart(4, '0');
+                    console.error('❌ Erreur chargement CMR:', error);
+                    
+                    // Fallback : utiliser un numéro temporaire basé sur l'ID
+                    delivery.cmrNumber = 'CMR-' + String(delivery.id).padStart(6, '0');
                     this.showToast('⚠️ Mode hors ligne - numéro temporaire');
+                    
+                    this.populateCMRView(delivery);
+                    document.getElementById('cmr-view').style.display = 'block';
                 }
-                
-                this.populateCMRView(delivery); 
+            }, 
                 document.getElementById('cmr-view').style.display = 'block'; 
             },
             populateCMRView: function(delivery) {
