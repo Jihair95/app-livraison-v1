@@ -265,10 +265,15 @@
         </div>
     </div>
     <script>
-        // URL de l'API Google Apps Script
-        const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbyIVItWQ7-dLCU9TVaqTPI6ye7_9ElCriqSO8O9CnwqMJToufgEkVKeyMk8S7Pq7HFTBw/exec";
+        // URL de l'API Google Apps Script avec proxy CORS
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbyIVItWQ7-dLCU9TVaqTPI6ye7_9ElCriqSO8O9CnwqMJToufgEkVKeyMk8S7Pq7HFTBw/exec";
         
-        console.log('📍 API URL:', SHEET_API_URL);
+        // Proxy CORS gratuit pour contourner les restrictions
+        const CORS_PROXY = "https://corsproxy.io/?";
+        const SHEET_API_URL = CORS_PROXY + encodeURIComponent(SHEET_API_URL_DIRECT);
+        
+        console.log('📍 API URL Direct:', SHEET_API_URL_DIRECT);
+        console.log('📍 API URL avec Proxy:', SHEET_API_URL);
         const app = {
             data: { deliveries: [], currentUser: null, filter: 'all', currentDelivery: null, isEditMode: false, wizard: { type: null, step: 1, currentItemPhotos: [], signatures: {}, cargoList: [], truckPlate: "", driverName: "", pads: {} }, syncQueue: [], isOnline: true },
             init: function() {
