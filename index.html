@@ -265,15 +265,19 @@
         </div>
     </div>
     <script>
-        // URL de l'API Google Apps Script avec proxy CORS
+        // URL de l'API Google Apps Script
         const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbw7nrderXO9dUdWJVnOkEskQ-3GAuwV-9wgewX3YZwD4INMyamoIMsMrpcLSaabzQC5Jw/exec";
         
-        // Proxy CORS plus fiable (allorigins au lieu de corsproxy)
-        const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-        const SHEET_API_URL = CORS_PROXY + encodeURIComponent(SHEET_API_URL_DIRECT);
+        // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
+        // Pour CMR automatique : héberger sur serveur local avec Python
+        // Commande : python -m http.server 8000
+        // Ou désactiver temporairement l'auto-génération CMR
         
-        console.log('📍 API URL Direct:', SHEET_API_URL_DIRECT);
-        console.log('📍 API URL avec Proxy:', SHEET_API_URL);
+        // Pour l'instant : CMR manuel via bouton "Afficher CMR"
+        const SHEET_API_URL = SHEET_API_URL_DIRECT;
+        
+        console.log('📍 API URL:', SHEET_API_URL);
+        console.log('⚠️ CMR automatique désactivé (nécessite serveur local pour éviter CORS)');
         const app = {
             data: { deliveries: [], currentUser: null, filter: 'all', currentDelivery: null, isEditMode: false, wizard: { type: null, step: 1, currentItemPhotos: [], signatures: {}, cargoList: [], truckPlate: "", driverName: "", pads: {} }, syncQueue: [], isOnline: true },
             init: function() {
