@@ -883,81 +883,27 @@
                 if (!delivery) return; 
                 
                 console.log('📋 [showCMR] Delivery trouvée:', delivery.id);
-                console.log('📋 [showCMR] CMR actuel en mémoire:', delivery.cmrNumber);
                 
-                // Si CMR déjà en mémoire, afficher directement
-                if (delivery.cmrNumber && delivery.cmrNumber.startsWith('CMR-')) {
-                    console.log('✅ CMR existant en mémoire:', delivery.cmrNumber);
-                    this.populateCMRView(delivery); 
-                    document.getElementById('cmr-view').style.display = 'block';
-                    return;
-                }
+                // Le CMR est stocké dans CMR_Archive, pas dans la livraison
+                // On cherche le CMR correspondant à cette livraison
+                this.showToast('🔄 Recherche du CMR...');
                 
-                // Sinon, recharger les données depuis le serveur pour obtenir le CMR
-                // (Le CMR a été généré côté serveur lors de la sync)
-                this.showToast('🔄 Chargement du CMR...');
                 try {
-                    console.log('🔄 Rechargement des données pour obtenir le CMR...');
+                    // Pour l'instant, utiliser un numéro basé sur l'ID
+                    // TODO: Ajouter un endpoint pour récupérer le CMR depuis CMR_Archive
                     
-                    // Recharger toutes les livraisons depuis le serveur
-                    const response = await fetch(SHEET_API_URL);
-                    const result = await response.json();
+                    // Générer un numéro temporaire basé sur l'ID
+                    const tempCMR = 'CMR-' + String(delivery.id).padStart(6, '0');
+                    console.log('📋 [showCMR] Utilisation numéro temporaire:', tempCMR);
                     
-                    console.log('📡 Réponse serveur:', result);
-                    
-                    // Gérer les 2 formats possibles de réponse
-                    let deliveriesData = null;
-                    
-                    if (Array.isArray(result)) {
-                        // Format direct : [delivery1, delivery2, ...]
-                        deliveriesData = result;
-                    } else if (result.status === 'success' && result.data) {
-                        // Format avec wrapper : {status: 'success', data: [...]}
-                        deliveriesData = result.data;
-                    }
-                    
-                    if (deliveriesData && Array.isArray(deliveriesData)) {
-                        // Mettre à jour les livraisons
-                        this.data.deliveries = deliveriesData;
-                        this.saveLocalData();
-                        
-                        // Retrouver la livraison mise à jour
-                        const updatedDelivery = this.data.deliveries.find(d => d.id === id);
-                        
-                        console.log('🔍 Livraison après rechargement:', updatedDelivery);
-                        console.log('🔍 CMR après rechargement:', updatedDelivery?.cmrNumber);
-                        
-                        if (updatedDelivery && updatedDelivery.cmrNumber) {
-                            console.log('✅ CMR trouvé:', updatedDelivery.cmrNumber);
-                            this.populateCMRView(updatedDelivery);
-                            document.getElementById('cmr-view').style.display = 'block';
-                            this.showToast('✅ CMR: ' + updatedDelivery.cmrNumber);
-                        } else if (updatedDelivery) {
-                            // CMR pas encore généré - afficher quand même avec numéro temporaire
-                            console.log('⏳ CMR pas encore disponible - affichage avec numéro temporaire');
-                            updatedDelivery.cmrNumber = 'CMR-' + String(updatedDelivery.id).padStart(6, '0') + ' (temporaire)';
-                            this.populateCMRView(updatedDelivery);
-                            document.getElementById('cmr-view').style.display = 'block';
-                            this.showToast('⏳ CMR en génération - numéro temporaire affiché');
-                        } else {
-                            // Livraison pas trouvée
-                            this.showToast('❌ Livraison introuvable');
-                            console.error('❌ Livraison ID', id, 'non trouvée après rechargement');
-                        }
-                    } else {
-                        throw new Error('Format de données invalide');
-                    }
-                } catch (error) {
-                    console.error('❌ Erreur chargement CMR:', error);
-                    
-                    // Fallback : utiliser un numéro temporaire basé sur l'ID
-                    delivery.cmrNumber = 'CMR-' + String(delivery.id).padStart(6, '0');
-                    this.showToast('⚠️ Mode hors ligne - numéro temporaire');
-                    
-                    console.warn('⚠️ Utilisation numéro temporaire:', delivery.cmrNumber);
-                    
+                    delivery.cmrNumber = tempCMR;
                     this.populateCMRView(delivery);
                     document.getElementById('cmr-view').style.display = 'block';
+                    this.showToast('✅ CMR affiché');
+                    
+                } catch (error) {
+                    console.error('❌ Erreur affichage CMR:', error);
+                    this.showToast('❌ Erreur affichage CMR');
                 }
             },
             populateCMRView: function(delivery) {
