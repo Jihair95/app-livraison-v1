@@ -932,10 +932,17 @@
                             this.populateCMRView(updatedDelivery);
                             document.getElementById('cmr-view').style.display = 'block';
                             this.showToast('✅ CMR: ' + updatedDelivery.cmrNumber);
+                        } else if (updatedDelivery) {
+                            // CMR pas encore généré - afficher quand même avec numéro temporaire
+                            console.log('⏳ CMR pas encore disponible - affichage avec numéro temporaire');
+                            updatedDelivery.cmrNumber = 'CMR-' + String(updatedDelivery.id).padStart(6, '0') + ' (temporaire)';
+                            this.populateCMRView(updatedDelivery);
+                            document.getElementById('cmr-view').style.display = 'block';
+                            this.showToast('⏳ CMR en génération - numéro temporaire affiché');
                         } else {
-                            // Pas encore de CMR - généré dans quelques secondes
-                            this.showToast('⏳ CMR en cours de génération... Réessayez dans 5 secondes');
-                            console.log('⏳ CMR pas encore disponible - sync en cours');
+                            // Livraison pas trouvée
+                            this.showToast('❌ Livraison introuvable');
+                            console.error('❌ Livraison ID', id, 'non trouvée après rechargement');
                         }
                     } else {
                         throw new Error('Format de données invalide');
