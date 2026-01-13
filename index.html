@@ -905,9 +905,20 @@
                     
                     console.log('📡 Réponse serveur:', result);
                     
-                    if (result.status === 'success' && result.data) {
+                    // Gérer les 2 formats possibles de réponse
+                    let deliveriesData = null;
+                    
+                    if (Array.isArray(result)) {
+                        // Format direct : [delivery1, delivery2, ...]
+                        deliveriesData = result;
+                    } else if (result.status === 'success' && result.data) {
+                        // Format avec wrapper : {status: 'success', data: [...]}
+                        deliveriesData = result.data;
+                    }
+                    
+                    if (deliveriesData && Array.isArray(deliveriesData)) {
                         // Mettre à jour les livraisons
-                        this.data.deliveries = result.data;
+                        this.data.deliveries = deliveriesData;
                         this.saveLocalData();
                         
                         // Retrouver la livraison mise à jour
@@ -927,7 +938,7 @@
                             console.log('⏳ CMR pas encore disponible - sync en cours');
                         }
                     } else {
-                        throw new Error('Erreur chargement données');
+                        throw new Error('Format de données invalide');
                     }
                 } catch (error) {
                     console.error('❌ Erreur chargement CMR:', error);
