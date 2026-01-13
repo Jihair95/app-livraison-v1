@@ -880,30 +880,65 @@
             },
             showCMR: async function(id) { 
                 const delivery = this.data.deliveries.find(d => d.id === id); 
-                if (!delivery) return; 
+                if (!delivery) {
+                    this.showToast('❌ Livraison introuvable');
+                    return;
+                }
                 
                 console.log('📋 [showCMR] Delivery trouvée:', delivery.id);
+                console.log('📋 [showCMR] Nature:', delivery.nature);
+                console.log('📋 [showCMR] Driver:', delivery.driver);
+                console.log('📋 [showCMR] FromAddr:', delivery.fromAddr);
                 
-                // Le CMR est stocké dans CMR_Archive, pas dans la livraison
-                // On cherche le CMR correspondant à cette livraison
-                this.showToast('🔄 Recherche du CMR...');
+                // Chercher le vrai numéro CMR dans CMR_Archive
+                this.showToast('🔄 Recherche du CMR dans l\'archive...');
                 
                 try {
-                    // Pour l'instant, utiliser un numéro basé sur l'ID
-                    // TODO: Ajouter un endpoint pour récupérer le CMR depuis CMR_Archive
+                    // Préparer les paramètres de recherche
+                    const params = new URLSearchParams({
+                        action: 'get_cmr_for_delivery',
+                        nature: delivery.nature || '',
+                        driver: delivery.driver || '',
+                        fromAddr: delivery.fromAddr || ''
+                    });
                     
-                    // Générer un numéro temporaire basé sur l'ID
-                    const tempCMR = 'CMR-' + String(delivery.id).padStart(6, '0');
-                    console.log('📋 [showCMR] Utilisation numéro temporaire:', tempCMR);
+                    console.log('🔍 Recherche CMR avec params:', params.toString());
                     
-                    delivery.cmrNumber = tempCMR;
+                    // Appeler l'API
+                    const response = await fetch(SHEET_API_URL + '&' + params.toString());
+                    
+                    if (!response.ok) {
+                        throw new Error('Erreur réseau: ' + response.status);
+                    }
+                    
+                    const result = await response.json();
+                    console.log('📡 Réponse API:', result);
+                    
+                    // Vérifier si CMR trouvé
+                    if (result.status === 'success' && result.data && result.data.cmrNumber) {
+                        delivery.cmrNumber = result.data.cmrNumber;
+                        console.log('✅ CMR trouvé:', delivery.cmrNumber);
+                        this.showToast('✅ CMR: ' + delivery.cmrNumber);
+                    } else {
+                        // CMR pas encore généré
+                        delivery.cmrNumber = 'En attente de génération';
+                        console.log('⏳ CMR pas encore disponible');
+                        this.showToast('⏳ CMR en cours de génération - réessayez dans quelques secondes');
+                    }
+                    
+                    // Afficher le PDF
                     this.populateCMRView(delivery);
                     document.getElementById('cmr-view').style.display = 'block';
-                    this.showToast('✅ CMR affiché');
                     
                 } catch (error) {
-                    console.error('❌ Erreur affichage CMR:', error);
-                    this.showToast('❌ Erreur affichage CMR');
+                    console.error('❌ Erreur recherche CMR:', error);
+                    
+                    // Fallback : utiliser l'ID comme numéro temporaire
+                    delivery.cmrNumber = 'CMR-' + String(delivery.id).padStart(6, '0') + ' (temporaire)';
+                    this.showToast('⚠️ CMR temporaire - réessayez pour obtenir le numéro officiel');
+                    
+                    this.populateCMRView(delivery);
+                    document.getElementById('cmr-view').style.display = 'block';
                 }
             },
             populateCMRView: function(delivery) {
