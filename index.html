@@ -266,7 +266,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbw78KdZ7EDKWgSplUMOPs_9iM8JqkRzlQjFeehX-4Td1NhDeSWwwtSWq4LqlIgk-tCMBg/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbzmBwZ8-REODwMexE2NooC2vDK6kr8t_PXcglZuRKMvNI7G5SvjKIAsaCfiIvN4U2BrHg/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -882,6 +882,9 @@
                 const delivery = this.data.deliveries.find(d => d.id === id); 
                 if (!delivery) return; 
                 
+                console.log('📋 [showCMR] Delivery trouvée:', delivery.id);
+                console.log('📋 [showCMR] CMR actuel en mémoire:', delivery.cmrNumber);
+                
                 // Si CMR déjà en mémoire, afficher directement
                 if (delivery.cmrNumber && delivery.cmrNumber.startsWith('CMR-')) {
                     console.log('✅ CMR existant en mémoire:', delivery.cmrNumber);
@@ -900,6 +903,8 @@
                     const response = await fetch(SHEET_API_URL);
                     const result = await response.json();
                     
+                    console.log('📡 Réponse serveur:', result);
+                    
                     if (result.status === 'success' && result.data) {
                         // Mettre à jour les livraisons
                         this.data.deliveries = result.data;
@@ -907,6 +912,9 @@
                         
                         // Retrouver la livraison mise à jour
                         const updatedDelivery = this.data.deliveries.find(d => d.id === id);
+                        
+                        console.log('🔍 Livraison après rechargement:', updatedDelivery);
+                        console.log('🔍 CMR après rechargement:', updatedDelivery?.cmrNumber);
                         
                         if (updatedDelivery && updatedDelivery.cmrNumber) {
                             console.log('✅ CMR trouvé:', updatedDelivery.cmrNumber);
@@ -927,6 +935,8 @@
                     // Fallback : utiliser un numéro temporaire basé sur l'ID
                     delivery.cmrNumber = 'CMR-' + String(delivery.id).padStart(6, '0');
                     this.showToast('⚠️ Mode hors ligne - numéro temporaire');
+                    
+                    console.warn('⚠️ Utilisation numéro temporaire:', delivery.cmrNumber);
                     
                     this.populateCMRView(delivery);
                     document.getElementById('cmr-view').style.display = 'block';
