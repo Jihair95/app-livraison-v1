@@ -323,7 +323,24 @@
             saveToGoogleSheets: function(delivery) {
                 if (!this.validateAPIUrl()) { this.addToSyncQueue(delivery); return Promise.resolve(false); }
                 console.log("📤 Send:", delivery.id);
-                return fetch(SHEET_API_URL, { method: 'POST', body: JSON.stringify([delivery]) }).then(r => r.json()).then(result => { console.log("✅ OK:", result); return true; }).catch(e => { console.error("❌ Error:", e); this.addToSyncQueue(delivery); return false; });
+                return fetch(SHEET_API_URL, { method: 'POST', body: JSON.stringify([delivery]) })
+                    .then(r => r.json())
+                    .then(result => { 
+                        console.log("✅ OK:", result); 
+                        
+                        // v18.9: Recharger les données pour obtenir le CMR généré côté serveur
+                        if (delivery.status === 'delivered') {
+                            console.log('🔄 Rechargement pour récupérer le CMR...');
+                            setTimeout(() => {
+                                this.loadDeliveries().then(() => {
+                                    console.log('✅ Données rechargées avec CMR');
+                                });
+                            }, 2000); // Attendre 2 secondes que le serveur finisse
+                        }
+                        
+                        return true; 
+                    })
+                    .catch(e => { console.error("❌ Error:", e); this.addToSyncQueue(delivery); return false; });
             },
             addToSyncQueue: function(delivery) {
                 this.data.syncQueue.push({ id: Date.now(), delivery: delivery, timestamp: new Date().toISOString(), retries: 0 });
