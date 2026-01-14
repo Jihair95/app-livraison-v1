@@ -266,7 +266,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbwp6y72nznYG0KP-ESZDInFYXF8E6erATKTlcoEJrDLyt53ZW8ReDJg3nnlp5pLgCr4Fw/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbzT5gRcM2mw6-MC3wL9VonDtDaLTysDvr6KtVYzXkJI3CtFbl8AdSH9W8mymYU5iusd9Q/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -595,13 +595,15 @@
                     case 'picked_up': return `<button class="btn-action btn-deliver" onclick="app.startWizard('delivery', ${delivery.id})">🚚 Commencer la livraison</button><button class="btn-action btn-cmr" onclick="app.showCMR(${delivery.id})">📄 Voir la CMR</button>`;
                     default: {
                         // Livraison terminée - vérifier si CMR généré
-                        const hasCMR = delivery.history && delivery.history.cmrNumber;
-                        const btnClass = hasCMR ? 'btn-cmr' : 'btn-cmr-disabled';
-                        const btnText = hasCMR ? '📄 Voir la CMR' : '⏳ CMR en génération...';
-                        const btnDisabled = hasCMR ? '' : 'disabled';
-                        const btnStyle = hasCMR ? '' : 'opacity:0.5;cursor:not-allowed;';
+                        const hasCMR = delivery.history && delivery.history.cmrNumber && delivery.history.cmrNumber.startsWith('CMR-');
                         
-                        return `<div style="padding:1rem;background:#d1fae5;color:#059669;border-radius:8px;font-weight:600;">Livraison Terminée</div><button class="btn-action ${btnClass}" onclick="app.showCMR(${delivery.id})" ${btnDisabled} style="${btnStyle}">${btnText}</button>`;
+                        if (hasCMR) {
+                            // CMR disponible - bouton actif
+                            return `<div style="padding:1rem;background:#d1fae5;color:#059669;border-radius:8px;font-weight:600;">✅ Livraison Terminée</div><button class="btn-action btn-cmr" onclick="app.showCMR(${delivery.id})" style="background:#16a34a;">📄 Voir la CMR</button>`;
+                        } else {
+                            // CMR en génération - bouton désactivé
+                            return `<div style="padding:1rem;background:#fef3c7;color:#d97706;border-radius:8px;font-weight:600;">⏳ Génération CMR...</div><button class="btn-action btn-cmr-disabled" disabled style="opacity:0.5;cursor:not-allowed;background:#9ca3af;color:#fff;">⏳ Veuillez patienter...</button>`;
+                        }
                     }
                 }
             },
@@ -867,36 +869,46 @@
                     this.openDetail(delivery.id);
                     this.renderList();
                     
-                    // Attendre 3 secondes que le serveur génère le CMR
-                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    // Démarrer le polling pour rafraîchir l'affichage toutes les 2 secondes
+                    let pollCount = 0;
+                    const maxPolls = 10; // Maximum 20 secondes
                     
-                    // Premier rechargement
-                    console.log('🔄 Premier rechargement...');
-                    await this.loadDeliveries();
-                    this.renderList(); // Rafraîchir la liste
-                    this.openDetail(delivery.id); // Rafraîchir les détails
+                    const pollForCMR = async () => {
+                        pollCount++;
+                        console.log(`🔄 Polling ${pollCount}/${maxPolls}...`);
+                        
+                        await this.loadDeliveries();
+                        const freshDelivery = this.data.deliveries.find(d => d.id === delivery.id);
+                        
+                        // Rafraîchir l'affichage
+                        this.renderList();
+                        this.openDetail(delivery.id);
+                        
+                        // Vérifier si CMR disponible
+                        if (freshDelivery?.history?.cmrNumber) {
+                            console.log('✅ CMR disponible:', freshDelivery.history.cmrNumber);
+                            this.showToast('✅ CMR prêt !');
+                            
+                            // Afficher automatiquement le CMR
+                            setTimeout(() => {
+                                this.showCMR(delivery.id);
+                            }, 500);
+                            
+                            return; // Arrêter le polling
+                        }
+                        
+                        // Continuer le polling si pas encore de CMR
+                        if (pollCount < maxPolls) {
+                            setTimeout(pollForCMR, 2000);
+                        } else {
+                            console.warn('⚠️ Timeout polling CMR');
+                            this.showToast('⚠️ CMR prend du temps - Réessayez manuellement');
+                        }
+                    };
                     
-                    // Attendre encore 2 secondes et recharger à nouveau (pour être SÛR)
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    console.log('🔄 Second rechargement...');
-                    await this.loadDeliveries();
-                    this.renderList(); // Rafraîchir la liste
-                    this.openDetail(delivery.id); // Rafraîchir les détails
+                    // Commencer le polling après 3 secondes
+                    setTimeout(pollForCMR, 3000);
                     
-                    // Récupérer la livraison fraîche
-                    const freshDelivery = this.data.deliveries.find(d => d.id === delivery.id);
-                    console.log('📋 Livraison fraîche:', freshDelivery);
-                    console.log('📋 CMR dans history:', freshDelivery?.history?.cmrNumber);
-                    
-                    // Afficher automatiquement le CMR si disponible
-                    if (freshDelivery?.history?.cmrNumber) {
-                        setTimeout(() => {
-                            this.showCMR(delivery.id);
-                            this.showToast('✅ CMR généré et affiché !');
-                        }, 500);
-                    } else {
-                        this.showToast('⚠️ CMR en cours de génération - Réessayez dans quelques secondes');
-                    }
                 } else {
                     document.getElementById('wizard-overlay').style.display = 'none';
                     this.openDetail(delivery.id);
