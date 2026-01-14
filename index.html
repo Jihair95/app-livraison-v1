@@ -266,7 +266,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbzLnDl1yF_PzxcJprif7sRTQfdIl7AKMa92l1gs-6FvB1qRXbTT_ow0KAVWhQ_tZwLLNg/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbwdCHtNLxnGgtgSRwchx3SX2NAjKqtiP5DnJtaKEzH4klhp-zcfcLfkTqqgQ-BZzPI2iA/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -879,10 +879,15 @@
                     // await this.generateAndArchiveCMR(delivery);
                 }
                 delivery.lastUpdated = now;
-                this.saveLocalData();
+                
+                // Sauvegarder SEULEMENT après le POST pour éviter double sync
+                // this.saveLocalData(); ← DÉSACTIVÉ temporairement
                 
                 // Sauvegarder et attendre le rechargement
                 await this.saveToGoogleSheets(delivery);
+                
+                // Maintenant sauvegarder localement
+                this.saveLocalData();
                 
                 // Si enlèvement OU livraison terminée, récupérer le CMR
                 if (delivery.status === 'picked_up' || delivery.status === 'delivered') {
