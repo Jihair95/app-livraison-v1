@@ -886,60 +886,23 @@
                 }
                 
                 console.log('📋 [showCMR] Delivery trouvée:', delivery.id);
-                console.log('📋 [showCMR] Nature:', delivery.nature);
-                console.log('📋 [showCMR] Driver:', delivery.driver);
-                console.log('📋 [showCMR] FromAddr:', delivery.fromAddr);
+                console.log('📋 [showCMR] History:', delivery.history);
                 
-                // Chercher le vrai numéro CMR dans CMR_Archive
-                this.showToast('🔄 Recherche du CMR dans l\'archive...');
-                
-                try {
-                    // Préparer les paramètres de recherche
-                    const params = new URLSearchParams({
-                        action: 'get_cmr_for_delivery',
-                        nature: delivery.nature || '',
-                        driver: delivery.driver || '',
-                        fromAddr: delivery.fromAddr || ''
-                    });
-                    
-                    console.log('🔍 Recherche CMR avec params:', params.toString());
-                    
-                    // Appeler l'API
-                    const response = await fetch(SHEET_API_URL + '&' + params.toString());
-                    
-                    if (!response.ok) {
-                        throw new Error('Erreur réseau: ' + response.status);
-                    }
-                    
-                    const result = await response.json();
-                    console.log('📡 Réponse API:', result);
-                    
-                    // Vérifier si CMR trouvé
-                    if (result.status === 'success' && result.data && result.data.cmrNumber) {
-                        delivery.cmrNumber = result.data.cmrNumber;
-                        console.log('✅ CMR trouvé:', delivery.cmrNumber);
-                        this.showToast('✅ CMR: ' + delivery.cmrNumber);
-                    } else {
-                        // CMR pas encore généré
-                        delivery.cmrNumber = 'En attente de génération';
-                        console.log('⏳ CMR pas encore disponible');
-                        this.showToast('⏳ CMR en cours de génération - réessayez dans quelques secondes');
-                    }
-                    
-                    // Afficher le PDF
-                    this.populateCMRView(delivery);
-                    document.getElementById('cmr-view').style.display = 'block';
-                    
-                } catch (error) {
-                    console.error('❌ Erreur recherche CMR:', error);
-                    
-                    // Fallback : utiliser l'ID comme numéro temporaire
-                    delivery.cmrNumber = 'CMR-' + String(delivery.id).padStart(6, '0') + ' (temporaire)';
-                    this.showToast('⚠️ CMR temporaire - réessayez pour obtenir le numéro officiel');
-                    
-                    this.populateCMRView(delivery);
-                    document.getElementById('cmr-view').style.display = 'block';
+                // Le CMR est stocké dans delivery.history.cmrNumber (généré côté serveur)
+                if (delivery.history && delivery.history.cmrNumber) {
+                    delivery.cmrNumber = delivery.history.cmrNumber;
+                    console.log('✅ CMR trouvé dans l\'historique:', delivery.cmrNumber);
+                    this.showToast('✅ CMR: ' + delivery.cmrNumber);
+                } else {
+                    // CMR pas encore généré
+                    delivery.cmrNumber = 'En attente de génération';
+                    console.log('⏳ CMR pas encore généré - réessayez dans quelques secondes');
+                    this.showToast('⏳ CMR en cours de génération - réessayez dans 5 secondes');
                 }
+                
+                // Afficher le PDF
+                this.populateCMRView(delivery);
+                document.getElementById('cmr-view').style.display = 'block';
             },
             populateCMRView: function(delivery) {
                 document.getElementById('cmr-ref').textContent = delivery.cmrNumber || 'CMR-0000';
