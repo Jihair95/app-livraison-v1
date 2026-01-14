@@ -355,12 +355,24 @@
                     .catch(e => { console.error("❌ Error:", e); this.addToSyncQueue(delivery); return false; });
             },
             addToSyncQueue: function(delivery) {
+                // v18.22: Ne pas ajouter à la queue si wizard actif (évite double envoi)
+                if (this.data.wizard && this.data.wizard.active) {
+                    console.log('⏭️ Wizard actif - Sync queue désactivée');
+                    return;
+                }
+                
                 this.data.syncQueue.push({ id: Date.now(), delivery: delivery, timestamp: new Date().toISOString(), retries: 0 });
                 this.saveLocalData();
                 this.setOnlineStatus(false);
                 console.log("📝 Queue:", this.data.syncQueue.length);
             },
             processSyncQueue: function() {
+                // v18.22: Ne pas traiter la queue si wizard actif
+                if (this.data.wizard && this.data.wizard.active) {
+                    console.log('⏭️ Wizard actif - Sync queue en pause');
+                    return;
+                }
+                
                 if (this.data.syncQueue.length === 0 || !this.data.isOnline) return;
                 const item = this.data.syncQueue[0];
                 this.saveToGoogleSheets(item.delivery).then(success => { if (success) { this.data.syncQueue.shift(); this.saveLocalData(); if (this.data.syncQueue.length > 0) { setTimeout(() => this.processSyncQueue(), 2000); } } else { item.retries++; if (item.retries > 3) { this.data.syncQueue.shift(); this.saveLocalData(); } } });
@@ -659,7 +671,17 @@
                 const delivery = this.data.deliveries.find(d => d.id === id);
                 if (!delivery) return;
                 this.data.currentDelivery = delivery;
-                this.data.wizard = { type: type, step: 1, currentItemPhotos: [], signatures: {}, cargoList: [], truckPlate: "", driverName: this.data.currentUser, pads: {} };
+                this.data.wizard = { 
+                    type: type, 
+                    step: 1, 
+                    currentItemPhotos: [], 
+                    signatures: {}, 
+                    cargoList: [], 
+                    truckPlate: "", 
+                    driverName: this.data.currentUser, 
+                    pads: {},
+                    active: true  // v18.22: Flag pour bloquer syncQueue
+                };
                 this.setupWizardSteps(type);
                 this.resetWizardFields();
                 document.getElementById('wizard-overlay').style.display = 'flex';
@@ -894,8 +916,10 @@
                     const actionName = delivery.status === 'picked_up' ? 'Enlèvement' : 'Livraison';
                     this.showToast(`🔄 ${actionName} enregistré - Récupération du CMR...`);
                     
-                    // Fermer le wizard et ouvrir les détails immédiatement
+                    // Fermer le wizard et réactiver syncQueue
                     document.getElementById('wizard-overlay').style.display = 'none';
+                    if (this.data.wizard) this.data.wizard.active = false; // v18.22: Réactiver syncQueue
+                    
                     this.openDetail(delivery.id);
                     this.renderList();
                     
@@ -944,6 +968,8 @@
                     
                 } else {
                     document.getElementById('wizard-overlay').style.display = 'none';
+                    if (this.data.wizard) this.data.wizard.active = false; // v18.22: Réactiver syncQueue
+                    
                     this.openDetail(delivery.id);
                     this.renderList();
                     this.showToast(`✅ ${wizard.type === 'pickup' ? 'Enlèvement' : 'Livraison'} enregistré !`);
