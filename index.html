@@ -277,7 +277,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbwdTy0IK4T6nCzs2sDR77gIUr6xSloh4eDeSFKvNSL0OoDyfnsAFG9qD9h5e0-nMEn_/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbyeLorS49v8sxHMVUrF4zmZGPk94F1EWYl7IV2yWRz60UOssvHUxmqZ7KRkLprlcEn58A/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -362,18 +362,25 @@
                 }
                 
                 console.log("📤 Send:", delivery.id);
+                
+                // v18.25: Détection Android
+                const isAndroid = /Android/i.test(navigator.userAgent);
+                
+                if (isAndroid) {
+                    console.log('📱 Mode Android - Using form submit workaround');
+                    return this.saveViaFormSubmit(delivery);
+                }
+                
+                // Desktop - fetch normal
                 console.log("📦 Data:", JSON.stringify(delivery).substring(0, 200) + '...');
-                console.log("🌐 URL:", SHEET_API_URL);
                 
                 return fetch(SHEET_API_URL, { 
-                    method: 'POST', 
-                    body: JSON.stringify([delivery]),
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    method: 'POST',
+                    body: JSON.stringify([delivery])
                 })
                 .then(r => {
                     console.log("📡 Response status:", r.status);
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
                     return r.json();
                 })
                 .then(result => { 
@@ -382,10 +389,45 @@
                 })
                 .catch(e => { 
                     console.error("❌ Error détaillé:", e); 
-                    console.error("❌ Type:", e.name);
-                    console.error("❌ Message:", e.message);
                     this.addToSyncQueue(delivery); 
                     return false; 
+                });
+            },
+            saveViaFormSubmit: function(delivery) {
+                // Workaround pour Android - utilise iframe + form
+                return new Promise((resolve) => {
+                    // Créer iframe invisible
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.name = 'sync-frame-' + Date.now();
+                    document.body.appendChild(iframe);
+                    
+                    // Créer form
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = SHEET_API_URL;
+                    form.target = iframe.name;
+                    
+                    // Ajouter data
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'data';
+                    input.value = JSON.stringify([delivery]);
+                    form.appendChild(input);
+                    
+                    document.body.appendChild(form);
+                    
+                    // Submit
+                    console.log('📤 Form submit pour Android...');
+                    form.submit();
+                    
+                    // Cleanup après 2s
+                    setTimeout(() => {
+                        document.body.removeChild(form);
+                        document.body.removeChild(iframe);
+                        console.log('✅ Envoyé via form (Android)');
+                        resolve(true);
+                    }, 2000);
                 });
             },
             addToSyncQueue: function(delivery) {
