@@ -856,11 +856,34 @@
                 }
                 delivery.lastUpdated = now;
                 this.saveLocalData();
-                this.saveToGoogleSheets(delivery);
+                
+                // Sauvegarder et attendre le rechargement avant d'ouvrir les détails
+                await this.saveToGoogleSheets(delivery);
+                
+                // Si livraison terminée, attendre le rechargement et afficher le CMR automatiquement
+                if (delivery.status === 'delivered') {
+                    this.showToast('🔄 Génération du CMR en cours...');
+                    // Attendre 4 secondes que le serveur génère et que le rechargement se fasse
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                    
+                    // Recharger une dernière fois pour être sûr
+                    await this.loadDeliveries();
+                    
+                    // Ouvrir les détails
+                    this.openDetail(delivery.id);
+                    
+                    // Afficher automatiquement le CMR
+                    setTimeout(() => {
+                        this.showCMR(delivery.id);
+                        this.showToast('✅ CMR généré et affiché !');
+                    }, 500);
+                } else {
+                    this.openDetail(delivery.id);
+                    this.showToast(`✅ ${wizard.type === 'pickup' ? 'Enlèvement' : 'Livraison'} enregistré !`);
+                }
+                
                 document.getElementById('wizard-overlay').style.display = 'none';
-                this.openDetail(delivery.id);
                 this.renderList();
-                this.showToast(`✅ ${wizard.type === 'pickup' ? 'Enlèvement' : 'Livraison'} enregistré !`);
             },
             generateAndArchiveCMR: async function(delivery) {
                 // Générer et archiver CMR automatiquement (silencieux)
