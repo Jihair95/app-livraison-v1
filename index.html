@@ -266,7 +266,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbxaoEdRovtUSiDamNtOt82Bfa5NBDcOsOfyLAdGxq-ceC_BibKJR_NlYaanZDcr9woZBg/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbwdTy0IK4T6nCzs2sDR77gIUr6xSloh4eDeSFKvNSL0OoDyfnsAFG9qD9h5e0-nMEn_/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -1064,54 +1064,66 @@
                 if (delivery.history?.driverSig) { driverImg.src = delivery.history.driverSig; driverImg.style.display = 'block'; } else { driverImg.style.display = 'none'; }
                 if (delivery.history?.recipientSig) { recipientImg.src = delivery.history.recipientSig; recipientImg.style.display = 'block'; recipientPlaceholder.style.display = 'none'; } else { recipientImg.style.display = 'none'; recipientPlaceholder.style.display = 'block'; }
             },
-            populateCMRPhotos: function(delivery) {
+            populateCMRPhotos: async function(delivery) {
                 const pickupPhotosGrid = document.getElementById('cmr-pickup-photos');
                 const deliveryPhotosGrid = document.getElementById('cmr-delivery-photos');
                 pickupPhotosGrid.innerHTML = '';
                 deliveryPhotosGrid.innerHTML = '';
                 
-                // Fonction pour charger photo via proxy
-                const loadPhoto = (photoUrl) => {
+                // Fonction pour charger photo
+                const loadPhoto = async (photoUrl) => {
                     // Si déjà en base64, retourner tel quel
                     if (photoUrl.startsWith('data:image')) {
                         return photoUrl;
                     }
                     
-                    // Si URL Drive, extraire l'ID et utiliser le proxy
+                    // Si URL Drive, extraire l'ID et charger via API
                     const idMatch = photoUrl.match(/id=([^&]+)/);
                     if (idMatch) {
-                        return `${SHEET_API_URL}?action=get_photo&id=${idMatch[1]}`;
+                        try {
+                            const response = await fetch(`${SHEET_API_URL}?action=get_photo&id=${idMatch[1]}`);
+                            const result = await response.json();
+                            if (result.data) {
+                                return result.data;
+                            }
+                        } catch (e) {
+                            console.error('Erreur chargement photo:', e);
+                        }
                     }
                     
                     return photoUrl;
                 };
                 
+                // Charger photos enlèvement
                 if (delivery.history?.cargo) { 
-                    delivery.history.cargo.forEach((cargo, cargoIndex) => { 
-                        if (cargo.photos && cargo.photos.length > 0) { 
-                            cargo.photos.forEach((photo, photoIndex) => { 
-                                if (photo) { 
-                                    const img = document.createElement('img'); 
-                                    img.src = loadPhoto(photo);
-                                    img.className = 'cmr-photo-large'; 
-                                    img.alt = `Enlèvement - Colis ${cargoIndex + 1} - Photo ${photoIndex + 1}`; 
-                                    pickupPhotosGrid.appendChild(img); 
-                                } 
-                            }); 
-                        } 
-                    }); 
+                    for (const cargo of delivery.history.cargo) {
+                        if (cargo.photos && cargo.photos.length > 0) {
+                            for (let i = 0; i < cargo.photos.length; i++) {
+                                const photo = cargo.photos[i];
+                                if (photo) {
+                                    const img = document.createElement('img');
+                                    img.className = 'cmr-photo-large';
+                                    img.alt = `Enlèvement - Colis - Photo ${i + 1}`;
+                                    img.src = await loadPhoto(photo);
+                                    pickupPhotosGrid.appendChild(img);
+                                }
+                            }
+                        }
+                    }
                 }
                 
-                if (delivery.history?.deliveryPhotos) { 
-                    delivery.history.deliveryPhotos.forEach((photo, index) => { 
-                        if (photo) { 
-                            const img = document.createElement('img'); 
-                            img.src = loadPhoto(photo);
-                            img.className = 'cmr-photo-large'; 
-                            img.alt = `Livraison - Photo ${index + 1}`; 
-                            deliveryPhotosGrid.appendChild(img); 
-                        } 
-                    }); 
+                // Charger photos livraison
+                if (delivery.history?.deliveryPhotos) {
+                    for (let i = 0; i < delivery.history.deliveryPhotos.length; i++) {
+                        const photo = delivery.history.deliveryPhotos[i];
+                        if (photo) {
+                            const img = document.createElement('img');
+                            img.className = 'cmr-photo-large';
+                            img.alt = `Livraison - Photo ${i + 1}`;
+                            img.src = await loadPhoto(photo);
+                            deliveryPhotosGrid.appendChild(img);
+                        }
+                    }
                 }
                 
                 document.getElementById('pickup-photos-section').style.display = pickupPhotosGrid.children.length > 0 ? 'block' : 'none';
