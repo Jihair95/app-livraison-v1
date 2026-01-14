@@ -266,7 +266,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbzmBwZ8-REODwMexE2NooC2vDK6kr8t_PXcglZuRKMvNI7G5SvjKIAsaCfiIvN4U2BrHg/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbxPd_OswFcmq_crn2cVk2rwku3LAMxbsth_NtLDvHXKqlFHI1vBWE0tUYXyYhO8GxAG/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -310,9 +310,32 @@
             logout: function() { this.data.currentUser = null; localStorage.removeItem('currentUser'); document.getElementById('app-container').classList.add('hidden'); document.getElementById('detail-view').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex'; document.getElementById('login-id').value = ''; },
             showDashboard: function() { document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-container').classList.remove('hidden'); document.getElementById('header-title').innerText = `Bonjour, ${this.data.currentUser}`; this.renderList(); },
             loadDeliveries: function() {
-                if (!this.validateAPIUrl()) { this.renderList(); return; }
+                if (!this.validateAPIUrl()) { 
+                    this.renderList(); 
+                    return Promise.resolve(); 
+                }
                 document.getElementById('delivery-list').innerHTML = '<div style="text-align:center;padding:2rem;color:#6b7280">🔄 Chargement...</div>';
-                fetch(SHEET_API_URL).then(r => { if (!r.ok) throw new Error('Network'); return r.json(); }).then(data => { if (Array.isArray(data)) { this.data.deliveries = data; this.saveLocalData(); this.showToast(`✅ ${data.length} livraisons chargées`); } else { console.error('Invalid:', data); } this.renderList(); }).catch(e => { console.error('Load error:', e); this.setOnlineStatus(false); this.renderList(); this.showToast("❌ Erreur connexion"); });
+                return fetch(SHEET_API_URL)
+                    .then(r => { 
+                        if (!r.ok) throw new Error('Network'); 
+                        return r.json(); 
+                    })
+                    .then(data => { 
+                        if (Array.isArray(data)) { 
+                            this.data.deliveries = data; 
+                            this.saveLocalData(); 
+                            this.showToast(`✅ ${data.length} livraisons chargées`); 
+                        } else { 
+                            console.error('Invalid:', data); 
+                        } 
+                        this.renderList(); 
+                    })
+                    .catch(e => { 
+                        console.error('Load error:', e); 
+                        this.setOnlineStatus(false); 
+                        this.renderList(); 
+                        this.showToast("❌ Erreur connexion"); 
+                    });
             },
             mergeDeliveries: function(serverData) {
                 const serverMap = new Map();
