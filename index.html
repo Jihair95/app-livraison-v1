@@ -266,7 +266,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbwWF8u7gRg0aG9II5n8TyBwmHeEJdTr2TNVUXdfcpC15EzKtn491EhkDkkLmTsp4wtm6Q/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbwkmoWY8KCT5X7ufQhQQhE_BlYtQrNbvN42K6HpgGpUvN4Jd1m1_iya4NSqbL9jZVTLUQ/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -592,14 +592,25 @@
                 switch(delivery.status) {
                     case 'pending': return `<button class="btn-action btn-assign" onclick="app.assignDelivery(${delivery.id})">Prendre en charge</button>`;
                     case 'assigned': return `<button class="btn-action btn-pickup" onclick="app.startWizard('pickup', ${delivery.id})">📦 Commencer l'enlèvement</button>`;
-                    case 'picked_up': return `<button class="btn-action btn-deliver" onclick="app.startWizard('delivery', ${delivery.id})">🚚 Commencer la livraison</button><button class="btn-action btn-cmr" onclick="app.showCMR(${delivery.id})">📄 Voir la CMR</button>`;
+                    case 'picked_up': {
+                        // Après enlèvement - vérifier si CMR généré
+                        const hasCMR = delivery.history && delivery.history.cmrNumber && delivery.history.cmrNumber.startsWith('CMR-');
+                        
+                        if (hasCMR) {
+                            // CMR disponible - afficher bouton + bouton livraison
+                            return `<button class="btn-action btn-deliver" onclick="app.startWizard('delivery', ${delivery.id})">🚚 Commencer la livraison</button><button class="btn-action btn-cmr" onclick="app.showCMR(${delivery.id})" style="background:#3b82f6;">📄 Voir la CMR (${delivery.history.cmrNumber})</button>`;
+                        } else {
+                            // CMR en génération
+                            return `<button class="btn-action btn-deliver" onclick="app.startWizard('delivery', ${delivery.id})">🚚 Commencer la livraison</button><button class="btn-action btn-cmr-disabled" disabled style="opacity:0.5;cursor:not-allowed;background:#9ca3af;color:#fff;">⏳ CMR en génération...</button>`;
+                        }
+                    }
                     default: {
                         // Livraison terminée - vérifier si CMR généré
                         const hasCMR = delivery.history && delivery.history.cmrNumber && delivery.history.cmrNumber.startsWith('CMR-');
                         
                         if (hasCMR) {
                             // CMR disponible - bouton actif
-                            return `<div style="padding:1rem;background:#d1fae5;color:#059669;border-radius:8px;font-weight:600;">✅ Livraison Terminée</div><button class="btn-action btn-cmr" onclick="app.showCMR(${delivery.id})" style="background:#16a34a;">📄 Voir la CMR</button>`;
+                            return `<div style="padding:1rem;background:#d1fae5;color:#059669;border-radius:8px;font-weight:600;">✅ Livraison Terminée</div><button class="btn-action btn-cmr" onclick="app.showCMR(${delivery.id})" style="background:#16a34a;">📄 Voir la CMR (${delivery.history.cmrNumber})</button>`;
                         } else {
                             // CMR en génération - bouton désactivé
                             return `<div style="padding:1rem;background:#fef3c7;color:#d97706;border-radius:8px;font-weight:600;">⏳ Génération CMR...</div><button class="btn-action btn-cmr-disabled" disabled style="opacity:0.5;cursor:not-allowed;background:#9ca3af;color:#fff;">⏳ Veuillez patienter...</button>`;
@@ -857,21 +868,22 @@
                 delivery.lastUpdated = now;
                 this.saveLocalData();
                 
-                // Sauvegarder et attendre le rechargement avant d'ouvrir les détails
+                // Sauvegarder et attendre le rechargement
                 await this.saveToGoogleSheets(delivery);
                 
-                // Si livraison terminée, attendre le rechargement et afficher le CMR automatiquement
-                if (delivery.status === 'delivered') {
-                    this.showToast('🔄 Génération du CMR en cours...');
+                // Si enlèvement OU livraison terminée, récupérer le CMR
+                if (delivery.status === 'picked_up' || delivery.status === 'delivered') {
+                    const actionName = delivery.status === 'picked_up' ? 'Enlèvement' : 'Livraison';
+                    this.showToast(`🔄 ${actionName} enregistré - Récupération du CMR...`);
                     
-                    // Fermer le wizard et ouvrir les détails immédiatement (bouton grisé)
+                    // Fermer le wizard et ouvrir les détails immédiatement
                     document.getElementById('wizard-overlay').style.display = 'none';
                     this.openDetail(delivery.id);
                     this.renderList();
                     
-                    // Démarrer le polling pour rafraîchir l'affichage toutes les 2 secondes
+                    // Démarrer le polling pour récupérer le CMR
                     let pollCount = 0;
-                    const maxPolls = 10; // Maximum 20 secondes
+                    const maxPolls = 10;
                     
                     const pollForCMR = async () => {
                         pollCount++;
@@ -887,12 +899,15 @@
                         // Vérifier si CMR disponible
                         if (freshDelivery?.history?.cmrNumber) {
                             console.log('✅ CMR disponible:', freshDelivery.history.cmrNumber);
-                            this.showToast('✅ CMR prêt !');
+                            this.showToast(`✅ ${actionName} terminé - CMR: ${freshDelivery.history.cmrNumber}`);
                             
-                            // Afficher automatiquement le CMR
-                            setTimeout(() => {
-                                this.showCMR(delivery.id);
-                            }, 500);
+                            // Pour l'enlèvement, juste notifier
+                            // Pour la livraison, afficher automatiquement
+                            if (delivery.status === 'delivered') {
+                                setTimeout(() => {
+                                    this.showCMR(delivery.id);
+                                }, 500);
+                            }
                             
                             return; // Arrêter le polling
                         }
@@ -902,7 +917,7 @@
                             setTimeout(pollForCMR, 2000);
                         } else {
                             console.warn('⚠️ Timeout polling CMR');
-                            this.showToast('⚠️ CMR prend du temps - Réessayez manuellement');
+                            this.showToast(`⚠️ ${actionName} enregistré - CMR en génération`);
                         }
                     };
                     
