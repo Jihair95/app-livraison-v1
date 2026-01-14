@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Suivi Livraisons - Chauffeur Pro v18.7</title>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    
+    <!-- 🔧 Console mobile Eruda pour debug Android -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>
+        // Activer Eruda seulement sur mobile
+        if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+            eruda.init();
+            console.log('📱 Console mobile activée !');
+        }
+    </script>
+    
     <style>
         :root {
             --primary: #2563eb;
@@ -344,15 +355,38 @@
                 serverMap.forEach(d => this.data.deliveries.push(d));
             },
             saveToGoogleSheets: function(delivery) {
-                if (!this.validateAPIUrl()) { this.addToSyncQueue(delivery); return Promise.resolve(false); }
+                if (!this.validateAPIUrl()) { 
+                    console.warn('⚠️ API URL invalide');
+                    this.addToSyncQueue(delivery); 
+                    return Promise.resolve(false); 
+                }
+                
                 console.log("📤 Send:", delivery.id);
-                return fetch(SHEET_API_URL, { method: 'POST', body: JSON.stringify([delivery]) })
-                    .then(r => r.json())
-                    .then(result => { 
-                        console.log("✅ OK:", result); 
-                        return true; 
-                    })
-                    .catch(e => { console.error("❌ Error:", e); this.addToSyncQueue(delivery); return false; });
+                console.log("📦 Data:", JSON.stringify(delivery).substring(0, 200) + '...');
+                console.log("🌐 URL:", SHEET_API_URL);
+                
+                return fetch(SHEET_API_URL, { 
+                    method: 'POST', 
+                    body: JSON.stringify([delivery]),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(r => {
+                    console.log("📡 Response status:", r.status);
+                    return r.json();
+                })
+                .then(result => { 
+                    console.log("✅ OK:", result); 
+                    return true; 
+                })
+                .catch(e => { 
+                    console.error("❌ Error détaillé:", e); 
+                    console.error("❌ Type:", e.name);
+                    console.error("❌ Message:", e.message);
+                    this.addToSyncQueue(delivery); 
+                    return false; 
+                });
             },
             addToSyncQueue: function(delivery) {
                 // v18.22: Ne pas ajouter à la queue si wizard actif (évite double envoi)
