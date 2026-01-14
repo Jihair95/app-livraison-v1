@@ -266,7 +266,7 @@
     </div>
     <script>
         // URL de l'API Google Apps Script
-        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbxVf67RYMinF7M87IRfx_8tAih93mCh1eEMYJtTDHORnZMCg0qfN7xBrjU4Ex_jQ_P4/exec";
+        const SHEET_API_URL_DIRECT = "https://script.google.com/macros/s/AKfycbzLnDl1yF_PzxcJprif7sRTQfdIl7AKMa92l1gs-6FvB1qRXbTT_ow0KAVWhQ_tZwLLNg/exec";
         
         // IMPORTANT : Les proxies CORS gratuits sont instables (403, 408)
         // Pour CMR automatique : héberger sur serveur local avec Python
@@ -840,6 +840,19 @@
                 const wizard = this.data.wizard;
                 const now = new Date().toISOString();
                 const locationStr = location ? `${location.lat},${location.lng}` : "GPS indisponible";
+                
+                // IMPORTANT v18.16: Récupérer les données fraîches du serveur pour avoir le cmrNumber
+                if (wizard.type === 'delivery') {
+                    console.log('🔄 Récupération données serveur avant livraison...');
+                    await this.loadDeliveries();
+                    const freshDelivery = this.data.deliveries.find(d => d.id === delivery.id);
+                    if (freshDelivery && freshDelivery.history) {
+                        // Fusionner history serveur avec delivery local
+                        delivery.history = {...freshDelivery.history, ...delivery.history};
+                        console.log('✅ CMR récupéré:', delivery.history.cmrNumber);
+                    }
+                }
+                
                 delivery.history = delivery.history || {};
                 if (wizard.type === 'pickup') {
                     delivery.status = 'picked_up';
